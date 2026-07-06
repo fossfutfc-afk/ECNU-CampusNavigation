@@ -1,0 +1,4 @@
+D:/CampusNavigation/Project/build/CMakeFiles/CampusNavigation.dir
+D:/CampusNavigation/Project/build/CMakeFiles/testall.dir
+D:/CampusNavigation/Project/build/CMakeFiles/edit_cache.dir
+D:/CampusNavigation/Project/build/CMakeFiles/rebuild_cache.dir
