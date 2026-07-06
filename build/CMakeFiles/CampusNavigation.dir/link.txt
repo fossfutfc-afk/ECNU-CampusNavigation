@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\CampusNavigation.dir/objects.a
+C:\TDM-GCC-64\bin\ar.exe qc CMakeFiles\CampusNavigation.dir/objects.a @CMakeFiles\CampusNavigation.dir\objects1.rsp
+C:\TDM-GCC-64\bin\c++.exe  -O2 -Wl,--whole-archive CMakeFiles\CampusNavigation.dir/objects.a -Wl,--no-whole-archive -o CampusNavigation.exe -Wl,--out-implib,libCampusNavigation.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\CampusNavigation.dir\linkLibs.rsp
