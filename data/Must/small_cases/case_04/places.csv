@@ -1,0 +1,9 @@
+place_id,display_name,category,stay_time,open_time,close_time
+P0001,Place_P0001,Teaching,20,00:00,23:59
+P0002,Place_P0002,Dining,30,06:00,12:00
+P0003,Place_P0003,Library,25,00:00,23:59
+P0004,Place_P0004,Sports,40,13:00,18:00
+P0005,Place_P0005,Other,10,00:00,23:59
+P0006,Place_P0006,Bar,35,18:00,23:00
+P0007,Place_P0007,Other,5,00:00,23:59
+P0008,Place_P0008,Dorm,0,00:00,23:59

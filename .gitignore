@@ -1,0 +1,11 @@
+build/
+build2/
+*.exe
+my_answer.txt
+diff_output.txt
+saved_places.csv
+saved_roads.csv
+.DS_Store
+web/BRIDGE_STARTED.txt
+web/chk*.txt
+web/__pycache__/

@@ -1,0 +1,8 @@
+place_id,display_name,category,stay_time,open_time,close_time
+P0001,Gate_North,Other,0,00:00,23:59
+P0002,Library,Teaching,30,08:00,22:00
+P0003,Canteen,Dining,40,06:30,20:30
+P0004,Lab,Teaching,20,08:00,18:00
+P0005,Dorm,Dormitory,0,00:00,23:59
+P0006,Gym,Sports,60,07:00,21:00
+P0007,Gate_South,Other,0,00:00,23:59

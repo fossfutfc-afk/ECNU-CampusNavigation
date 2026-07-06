@@ -1,0 +1,17 @@
+place_id,display_name,category,stay_time,open_time,close_time
+R1C1,1_1,Chessboard,0,00:00,23:59
+R1C2,1_2,Chessboard,0,00:00,23:59
+R1C3,1_3,Chessboard,0,00:00,23:59
+R1C4,1_4,Chessboard,0,00:00,23:59
+R2C1,2_1,Chessboard,0,00:00,23:59
+R2C2,2_2,Chessboard,0,00:00,23:59
+R2C3,2_3,Chessboard,0,00:00,23:59
+R2C4,2_4,Chessboard,0,00:00,23:59
+R3C1,3_1,Chessboard,0,00:00,23:59
+R3C2,3_2,Chessboard,0,00:00,23:59
+R3C3,3_3,Chessboard,0,00:00,23:59
+R3C4,3_4,Chessboard,0,00:00,23:59
+R4C1,4_1,Chessboard,0,00:00,23:59
+R4C2,4_2,Chessboard,0,00:00,23:59
+R4C3,4_3,Chessboard,0,00:00,23:59
+R4C4,4_4,Chessboard,0,00:00,23:59

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CampusNavigation 校园导航</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "Microsoft YaHei", sans-serif; display:flex; height:100vh; }
+
+/* ---- 左侧地图 ---- */
+#map { flex:1; min-width:0; }
+
+/* ---- 右侧面板 ---- */
+#panel {
+  width: 320px; background: #1e1e2e; color: #cdd6f4;
+  display:flex; flex-direction:column; overflow-y:auto;
+  padding: 16px; gap: 12px; font-size: 14px;
+}
+#panel h2 { font-size: 18px; color: #f5c2e7; text-align:center; margin-bottom:4px; }
+.section { background:#313244; border-radius:8px; padding:12px; }
+.section h3 { font-size:14px; color:#f9e2af; margin-bottom:8px; }
+
+select, input, button {
+  width:100%; padding:6px 10px; border-radius:6px; border:none;
+  font-size:13px; margin-bottom:6px;
+}
+select, input { background:#45475a; color:#cdd6f4; }
+button { background:#89b4fa; color:#1e1e2e; font-weight:bold; cursor:pointer; }
+button:hover { background:#b4d0fb; }
+button.danger { background:#f38ba8; }
+button.danger:hover { background:#f5a0b8; }
+button.accent { background:#a6e3a1; color:#1e1e2e; }
+button.accent:hover { background:#c0e8b8; }
+
+.row { display:flex; gap:6px; }
+.row button { flex:1; }
+
+#startId, #endId { background:#45475a; color:#f9e2af; font-weight:bold; text-align:center; }
+
+/* testall 输出 */
+#testOutput {
+  background:#11111b; color:#a6adc8; font-family:monospace; font-size:12px;
+  max-height:200px; overflow-y:auto; padding:8px; border-radius:6px;
+  white-space:pre-wrap; display:none;
+}
+
+/* category legend */
+.legend { display:flex; flex-wrap:wrap; gap:4px 12px; }
+.legend span { display:flex; align-items:center; gap:4px; font-size:12px; }
+.legend i { display:inline-block; width:12px; height:12px; border-radius:50%; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+  <h2>&#x1f3eb; CampusNavigation</h2>
+  <div id="badDataWarn" style="display:none;background:#c62828;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px">
+    ⚠ 此数据集包含非法数据（负数权值/非法状态），算法功能已禁用。非法边以深红虚线标出。
+  </div>
+
+  <!-- 数据加载 -->
+  <div class="section">
+    <h3>&#x1f4cd; 数据</h3>
+    <select id="datasetSelect"></select>
+    <button onclick="loadData()">加载数据</button>
+  </div>
+
+  <!-- 路径规划 -->
+  <div class="section">
+    <h3>&#x1f5fa; 路径规划</h3>
+    <div class="row">
+      <input id="startId" readonly placeholder="起点: 点击地图节点">
+      <input id="endId" readonly placeholder="终点: 点击地图节点">
+      <button onclick="clearSelection()" style="width:auto;padding:6px 12px">✕</button>
+    </div>
+    <div class="row">
+      <button class="algo-btn" onclick="runShortest('DIST')">SHORTEST DIST</button>
+      <button class="algo-btn" onclick="runShortest('TIME')">SHORTEST TIME</button>
+    </div>
+    <div class="row">
+      <input id="timeInput" placeholder="时刻 HH:MM" style="flex:1">
+      <button class="algo-btn" onclick="runTimedShortest()" style="flex:1">TIMED</button>
+    </div>
+    <div class="row">
+      <input id="kInput" placeholder="K (加速券)" style="flex:1" value="3">
+      <button class="algo-btn" onclick="runShortestK()" style="flex:1">SHORTEST_K</button>
+    </div>
+  </div>
+
+  <!-- 图算法 -->
+  <div class="section">
+    <h3>&#x1f333; 图算法</h3>
+    <div class="row">
+      <button class="accent algo-btn" onclick="runMST()">MST</button>
+      <button class="accent algo-btn" onclick="runCritical()">CRITICAL</button>
+    </div>
+    <div class="row">
+      <input id="mpInput" placeholder="必经点 空格分隔" style="flex:2">
+      <button class="algo-btn" onclick="runMustPass()" style="flex:1">MUST_PASS</button>
+    </div>
+    <button class="algo-btn" onclick="runComponents()">COMPONENTS</button>
+    <button onclick="clearHighlights()">清除高亮</button>
+  </div>
+
+
+  <!-- 图例 -->
+  <div class="section">
+    <h3>&#x1f3a8; 类别图例</h3>
+    <div class="legend">
+      <span><i style="background:#89b4fa"></i> Teaching</span>
+      <span><i style="background:#fab387"></i> Dining</span>
+      <span><i style="background:#a6e3a1"></i> Dormitory</span>
+      <span><i style="background:#f38ba8"></i> Sports</span>
+      <span><i style="background:#f9e2af"></i> Medical</span>
+      <span><i style="background:#bac2de"></i> Other</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/graph_data.js"></script>
+<script>
+// ==================== 全局状态 ====================
+let map, nodeMarkers = {}, edgeLines = [], highlightGroup;
+let selectedStart = null, selectedEnd = null;
+
+const CAT_COLORS = {
+  "Teaching": "#89b4fa", "Dining": "#fab387", "Dormitory": "#a6e3a1",
+  "Sports": "#f38ba8", "Medical": "#f9e2af", "Other": "#bac2de",
+  "Teaching_Research_and_Administration": "#89b4fa",
+  "Dining_room": "#fab387", "dormitory": "#a6e3a1",
+  "Sports_and_Entertainment": "#f38ba8", "other": "#bac2de"
+};
+
+// ==================== 初始化地图 ====================
+map = L.map('map', {
+  crs: L.CRS.Simple,
+  minZoom: -3, maxZoom: 3,
+  zoomControl: true,
+  attributionControl: false
+}).setView([300, 300], -1);
+
+highlightGroup = L.layerGroup().addTo(map);
+
+// ==================== 加载数据集列表 ====================
+fetch('/api/datasets')
+  .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
+  .then(dirs => {
+    const sel = document.getElementById('datasetSelect');
+    dirs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      if (d === 'Must/sample_ecnu') opt.selected = true;
+      sel.appendChild(opt);
+    });
+    console.log('Datasets loaded:', dirs.length);
+  })
+  .catch(e => alert('无法获取数据集列表: ' + e.message));
+
+// ==================== 加载数据 ====================
+function loadData() {
+  const dir = document.getElementById('datasetSelect').value;
+  // 所有数据已预生成在 ALL_GRAPHS 中，直接取用
+  if (typeof ALL_GRAPHS !== 'undefined' && ALL_GRAPHS[dir]) {
+    const g = ALL_GRAPHS[dir];
+    if (g.rejected) { alert(g.reject_reason); return; }
+    console.log('Preloaded:', g.vertices.length, 'V', g.edges.length, 'E');
+    renderGraph(g);
+    return;
+  }
+  // 兜底：API 加载
+  fetch('/api/load', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dir: dir})
+  })
+  .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    renderGraph(data);
+  })
+  .catch(e => alert('加载失败: ' + e.message));
+}
+
+// 启动时自动加载默认数据
+if (typeof ALL_GRAPHS !== 'undefined') {
+  setTimeout(() => { loadData(); }, 300);
+}
+
+function renderGraph(data) {
+  // 清除旧数据
+  Object.values(nodeMarkers).forEach(m => map.removeLayer(m));
+  edgeLines.forEach(l => map.removeLayer(l));
+  highlightGroup.clearLayers();
+  nodeMarkers = {};
+  edgeLines = [];
+  selectedStart = null; selectedEnd = null;
+
+  // 计算边界
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  data.vertices.forEach(v => {
+    if (v.x<minX) minX=v.x; if (v.y<minY) minY=v.y;
+    if (v.x>maxX) maxX=v.x; if (v.y>maxY) maxY=v.y;
+  });
+
+  console.log('Vertices:', data.vertices.length, 'Edges:', data.edges.length,
+    'Bad:', (data.bad_edges||[]).length, 'Bounds:', minX, minY, '→', maxX, maxY);
+
+  // 禁用算法按钮（数据不合法时）
+  const btns = document.querySelectorAll('.algo-btn');
+  btns.forEach(b => b.disabled = !!data.has_bad_data);
+  document.getElementById('badDataWarn').style.display = data.has_bad_data ? 'block' : 'none';
+
+  // 画非法边（深红虚线）
+  (data.bad_edges || []).forEach(e => {
+    const fromV = data.vertices.find(v => v.id === e.from);
+    const toV = data.vertices.find(v => v.id === e.to);
+    if (!fromV || !toV) return;
+    L.polyline([[fromV.y, fromV.x], [toV.y, toV.x]], {
+      color: '#B71C1C', weight: 3, dashArray: '6 4', opacity: 0.7
+    }).addTo(map).bindTooltip(`⚠ distance=${e.distance} walk_time=${e.walk_time}`,
+      {permanent: false, direction: 'center'});
+  });
+
+  // 画边
+  data.edges.forEach(e => {
+    const fromV = data.vertices.find(v => v.id === e.from);
+    const toV = data.vertices.find(v => v.id === e.to);
+    if (!fromV || !toV) return;
+    const color = e.status === 'open' ? '#4CAF50' : '#F44336';
+    const dash = e.status === 'closed' ? '8 4' : null;
+    const line = L.polyline([[fromV.y, fromV.x], [toV.y, toV.x]], {
+      color: color, weight: 3, dashArray: dash, opacity: 0.85
+    }).addTo(map);
+    edgeLines.push(line);
+  });
+
+  // 画节点
+  data.vertices.forEach(v => {
+    const catColor = CAT_COLORS[v.category] || '#bac2de';
+    const marker = L.circleMarker([v.y, v.x], {
+      radius: 8, color: '#333', weight: 2,
+      fillColor: catColor, fillOpacity: 0.9,
+      draggable: true
+    }).addTo(map);
+    // 隐形大圈扩大点击区域
+    marker._path && (marker._path.style.cursor = 'pointer');
+
+    marker.bindTooltip(
+      `<b>${v.id}</b> ${v.name}<br>${v.category} · ${v.open_time}~${v.close_time}`,
+      {direction: 'top'}
+    );
+
+    marker.on('click', () => selectNode(v.id));
+    marker.on('dragend', () => {
+      v.x = marker.getLatLng().lng;
+      v.y = marker.getLatLng().lat;
+      // 更新边位置
+      edgeLines.forEach(l => map.removeLayer(l));
+      edgeLines = [];
+      data.edges.forEach(e => {
+        const fv = data.vertices.find(n => n.id === e.from);
+        const tv = data.vertices.find(n => n.id === e.to);
+        if (!fv || !tv) return;
+        const clr = e.status === 'open' ? '#4CAF50' : '#F44336';
+        const dsh = e.status === 'closed' ? '8 4' : null;
+        edgeLines.push(L.polyline([[fv.y, fv.x], [tv.y, tv.x]], {
+          color: clr, weight: 2, dashArray: dsh, opacity: 0.7
+        }).addTo(map));
+      });
+    });
+
+    nodeMarkers[v.id] = marker;
+  });
+
+  // 自动适配视图到数据范围
+  if (data.vertices.length > 0) {
+    const pad = 30;
+    map.fitBounds([[minY-pad, minX-pad], [maxY+pad, maxX+pad]]);
+  }
+}
+
+// ==================== 节点选择 ====================
+function selectNode(id) {
+  if (!selectedStart) {
+    selectedStart = id;
+    document.getElementById('startId').value = id;
+    nodeMarkers[id]?.setStyle({radius: 9, color: '#2196F3', weight: 3});
+  } else if (!selectedEnd && id !== selectedStart) {
+    selectedEnd = id;
+    document.getElementById('endId').value = id;
+    nodeMarkers[id]?.setStyle({radius: 9, color: '#FF9800', weight: 3});
+  } else {
+    // 重新选择
+    if (selectedStart) nodeMarkers[selectedStart]?.setStyle({radius: 6, color: '#333', weight: 1.5});
+    if (selectedEnd) nodeMarkers[selectedEnd]?.setStyle({radius: 6, color: '#333', weight: 1.5});
+    selectedStart = id; selectedEnd = null;
+    document.getElementById('startId').value = id;
+    document.getElementById('endId').value = '';
+    nodeMarkers[id]?.setStyle({radius: 9, color: '#2196F3', weight: 3});
+  }
+}
+
+function clearSelection() {
+  if (selectedStart) { nodeMarkers[selectedStart]?.setStyle({radius:6,color:'#333',weight:1.5}); }
+  if (selectedEnd)   { nodeMarkers[selectedEnd]?.setStyle({radius:6,color:'#333',weight:1.5}); }
+  selectedStart = null; selectedEnd = null;
+  document.getElementById('startId').value = '';
+  document.getElementById('endId').value = '';
+}
+
+// ==================== 算法调用 ====================
+function currentDir() { return document.getElementById('datasetSelect').value; }
+
+function runShortest(mode) {
+  if (!selectedStart || !selectedEnd) { alert('请先点击地图选择起点和终点'); return; }
+  fetch('/api/shortest?dir='+encodeURIComponent(currentDir())+'&from='+selectedStart+'&to='+selectedEnd+'&mode='+mode+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    highlightGroup.clearLayers();
+    const coords = data.path.map(id => {
+      const m = nodeMarkers[id];
+      return m ? [m.getLatLng().lat, m.getLatLng().lng] : null;
+    }).filter(Boolean);
+    L.polyline(coords, {color:'#2196F3', weight:4, opacity:0.8}).addTo(highlightGroup);
+    // 高亮起终点
+    coords.forEach((c, i) => {
+      const color = (i===0) ? '#2196F3' : (i===coords.length-1) ? '#FF9800' : '#89b4fa';
+      L.circleMarker(c, {radius:4, color:color, fillColor:color, fillOpacity:1}).addTo(highlightGroup);
+    });
+  });
+}
+
+function runMST() {
+  fetch('/api/mst?dir='+encodeURIComponent(currentDir())+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    console.log('MST FULL:', JSON.stringify(data));
+    const mst = data.mst || data;
+    if (mst.error) { alert(mst.error); return; }
+    highlightGroup.clearLayers();
+    (mst.edges || []).forEach(e => {
+      const fm = nodeMarkers[e.u], tm = nodeMarkers[e.v];
+      if (!fm || !tm) return;
+      L.polyline([[fm.getLatLng().lat, fm.getLatLng().lng],
+                   [tm.getLatLng().lat, tm.getLatLng().lng]], {
+        color:'#FF9800', weight:4, opacity:0.9
+      }).addTo(highlightGroup);
+    });
+  });
+}
+
+function runMustPass() {
+  if (!selectedStart || !selectedEnd) { alert('请先选择起点和终点'); return; }
+  const wps = document.getElementById('mpInput').value.trim();
+  if (!wps) { alert('请输入必经点（空格分隔）'); return; }
+  if (!/^[A-Za-z0-9_ ]+$/.test(wps)) { alert('必经点格式错误，请用空格分隔的地点 ID'); return; }
+  fetch('/api/must_pass?dir='+encodeURIComponent(currentDir())+'&from='+selectedStart+'&to='+selectedEnd+'&mode=DIST&wps='+encodeURIComponent(wps)+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    highlightGroup.clearLayers();
+    drawPath(data.path, '#E91E63');
+  });
+}
+
+function runComponents() {
+  fetch('/api/components?dir='+encodeURIComponent(currentDir())+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    const sizes = (data.sizes || []).slice(0,10).join(', ');
+    alert('连通分量: ' + data.count + ' 个\n规模(前10): ' + sizes);
+  });
+}
+
+function runCritical() {
+  fetch('/api/critical_tarjan?dir='+encodeURIComponent(currentDir())+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    highlightGroup.clearLayers();
+    let n = 0, e = 0;
+    (data.critical_nodes || []).forEach(id => {
+      const m = nodeMarkers[id];
+      if (m) {
+        L.circleMarker(m.getLatLng(), {
+          radius:10, color:'#FFD700', weight:4, fillOpacity:0
+        }).addTo(highlightGroup);
+        n++;
+      }
+    });
+    (data.critical_edges || []).forEach(edge => {
+      const fm = nodeMarkers[edge.u], tm = nodeMarkers[edge.v];
+      if (!fm || !tm) return;
+      L.polyline([[fm.getLatLng().lat, fm.getLatLng().lng],
+                   [tm.getLatLng().lat, tm.getLatLng().lng]], {
+        color:'#9C27B0', weight:4, dashArray:'8 5', opacity:0.95
+      }).addTo(highlightGroup);
+      e++;
+    });
+    if (n === 0 && e === 0) {
+      alert('该图没有关键节点和关键边');
+    }
+    console.log('Critical: ' + n + ' nodes, ' + e + ' edges');
+  });
+}
+
+function runTimedShortest() {
+  if (!selectedStart || !selectedEnd) { alert('请先选择起点和终点'); return; }
+  const time = document.getElementById('timeInput').value || '10:00';
+  if (!/^\d{1,2}:\d{2}$/.test(time)) { alert('时间格式错误，请用 HH:MM（如 10:00）'); return; }
+  fetch('/api/timed_shortest?dir='+encodeURIComponent(currentDir())+'&from='+selectedStart+'&to='+selectedEnd+'&time='+time+'&mode=DIST&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    highlightGroup.clearLayers();
+    drawPath(data.path, '#2196F3');
+  });
+}
+
+function runShortestK() {
+  if (!selectedStart || !selectedEnd) { alert('请先选择起点和终点'); return; }
+  const k = parseInt(document.getElementById('kInput').value) || 0;
+  if (k < 0 || k > 10) { alert('K 必须在 0~10 之间'); return; }
+  fetch('/api/shortest_k?dir='+encodeURIComponent(currentDir())+'&from='+selectedStart+'&to='+selectedEnd+'&k='+k+'&_='+Date.now())
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    highlightGroup.clearLayers();
+    drawPath(data.path, '#FF9800');
+    // 用券边标黄色虚线
+    (data.fast_edges || []).forEach(e => {
+      const fm = nodeMarkers[e.u], tm = nodeMarkers[e.v];
+      if (!fm || !tm) return;
+      L.polyline([[fm.getLatLng().lat, fm.getLatLng().lng],
+                   [tm.getLatLng().lat, tm.getLatLng().lng]], {
+        color:'#FFEB3B', weight:5, dashArray:'4 2', opacity:0.9
+      }).addTo(highlightGroup);
+    });
+  });
+}
+
+function drawPath(path, color) {
+  if (!path) return;
+  const coords = path.map(id => {
+    const m = nodeMarkers[id];
+    return m ? [m.getLatLng().lat, m.getLatLng().lng] : null;
+  }).filter(Boolean);
+  L.polyline(coords, {color:color, weight:4, opacity:0.8}).addTo(highlightGroup);
+}
+
+function clearHighlights() {
+  highlightGroup.clearLayers();
+}
+
+</script>
+</body>
+</html>

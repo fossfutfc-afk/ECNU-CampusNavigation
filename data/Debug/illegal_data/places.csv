@@ -1,0 +1,7 @@
+place_id,display_name,category,stay_time,open_time,close_time
+P0001,Gate,Other,0,06:00,22:00
+P0002,Cafe,Dining,30,08:00,22:00
+P0003,Library,Teaching,45,08:00,22:00
+P0004,Dorm,Dormitory,0,00:00,23:59
+P0005,Gym,Sports,60,08:00,22:00
+P0006,Hospital,Medical,30,00:00,23:59

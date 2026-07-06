@@ -1,0 +1,7 @@
+OK
+ERROR unknown_command
+ERROR unknown_command
+ERROR unknown_command
+ERROR unknown_command
+ERROR unknown_command
+ERROR unknown_command

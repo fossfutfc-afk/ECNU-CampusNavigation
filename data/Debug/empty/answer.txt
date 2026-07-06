@@ -1,0 +1,18 @@
+OK
+ERROR place_not_found
+CATEGORY NULL 0
+ERROR place_not_found
+ERROR place_not_found
+ERROR place_not_found
+ERROR road_not_found
+ERROR road_not_found
+ERROR road_not_found
+ERROR road_not_found
+COMPONENTS 0 SIZES
+ERROR place_not_found
+ERROR place_not_found
+ERROR place_not_found
+DISCONNECTED
+CRITICAL NODES 0 EDGES 0
+ERROR place_not_found
+CRITICAL NODES 0 EDGES 0

@@ -1,0 +1,6 @@
+COMPONENTS 0 SIZES
+ERROR place_not_found
+ERROR place_not_found
+ERROR place_not_found
+ERROR place_not_found
+DISCONNECTED

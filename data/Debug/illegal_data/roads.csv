@@ -1,0 +1,8 @@
+from_id,to_id,distance,walk_time,status
+P0001,P0003,150,2,open
+P0001,P0004,300,5,open
+P0003,P0005,200,3,open
+P0004,P0005,100,-5,open
+P0001,P0006,-50,10,open
+P0005,P0006,120,2,open
+P0003,P0004,80,1,closed
